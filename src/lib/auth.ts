@@ -2,13 +2,19 @@
 
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, User } from "firebase/auth";
 import { firebaseApp, firebaseDatabase } from "./firebase";
+import { getApp, getApps } from "firebase/app";
 import { ref, set, get, child } from "firebase/database";
 
 function getAuthInstance() {
-  if (!firebaseApp) {
-    throw new Error("Firebase app is not initialized");
+  // Prefer the exported firebaseApp, but fall back to any initialized app
+  if (firebaseApp) {
+    return getAuth(firebaseApp);
   }
-  return getAuth(firebaseApp);
+  if (getApps && getApps().length > 0) {
+    // there is an initialized app elsewhere in the runtime
+    return getAuth(getApp());
+  }
+  throw new Error("Firebase app is not initialized");
 }
 
 export async function signIn(email: string, password: string) {
