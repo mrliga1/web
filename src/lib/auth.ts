@@ -1,30 +1,23 @@
 "use client";
 
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, User } from "firebase/auth";
-import { firebaseApp, firebaseDatabase } from "./firebase";
-import { getApp, getApps } from "firebase/app";
+import { app } from "./firebase";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged as onAuthStateChangedFn, User } from "firebase/auth";
 import { ref, set, get, child } from "firebase/database";
+import { firebaseDatabase } from "./firebase";
 
-function getAuthInstance() {
-  // Prefer the exported firebaseApp, but fall back to any initialized app
-  if (firebaseApp) {
-    return getAuth(firebaseApp);
-  }
-  if (getApps && getApps().length > 0) {
-    // there is an initialized app elsewhere in the runtime
-    return getAuth(getApp());
-  }
-  throw new Error("Firebase app is not initialized");
-}
+export const auth = getAuth(app);
 
 export async function signIn(email: string, password: string) {
-  const auth = getAuthInstance();
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-  return cred.user;
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    return cred.user;
+  } catch (err: unknown) {
+    console.error("Auth signIn error:", err);
+    throw err;
+  }
 }
 
 export async function register(email: string, password: string, role = "editor") {
-  const auth = getAuthInstance();
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const u = cred.user;
   if (!firebaseDatabase) {
@@ -35,13 +28,11 @@ export async function register(email: string, password: string, role = "editor")
 }
 
 export async function signOut() {
-  const auth = getAuthInstance();
   await firebaseSignOut(auth);
 }
 
 export function onAuthStateChanged(cb: (user: User | null) => void) {
-  const auth = getAuthInstance();
-  return auth.onAuthStateChanged(cb);
+  return onAuthStateChangedFn(auth, cb);
 }
 
 export async function getUserRole(uid: string) {
@@ -53,7 +44,6 @@ export async function getUserRole(uid: string) {
 }
 
 export async function getIdToken(forceRefresh = false) {
-  const auth = getAuthInstance();
   const user = auth.currentUser;
   if (!user) {
     throw new Error("User is not authenticated");

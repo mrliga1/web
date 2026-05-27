@@ -9,16 +9,35 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
   const router = useRouter();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(async (user) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-      const r = await getUserRole(user.uid);
-      if (r) window.localStorage.setItem("greeniaAdminRole", r);
+    // fallback: ensure we don't stay stuck forever
+    const fallback = setTimeout(() => {
+      console.warn("Auth check fallback triggered: clearing checking state");
       setChecking(false);
+    }, 6000);
+
+    const unsub = onAuthStateChanged(async (user) => {
+      try {
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+        try {
+          const r = await getUserRole(user.uid);
+          if (r) window.localStorage.setItem("greeniaAdminRole", r);
+        } catch (e) {
+          console.error("Failed to read user role:", e);
+        }
+      } finally {
+        clearTimeout(fallback);
+        setChecking(false);
+      }
     });
-    return () => unsub();
+    return () => {
+      clearTimeout(fallback);
+      try {
+        unsub();
+      } catch {}
+    };
   }, [router]);
 
   if (checking) {

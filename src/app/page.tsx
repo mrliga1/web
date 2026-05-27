@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { ref as dbRef, onValue } from "firebase/database";
+import { firebaseDatabase } from "../lib/firebase";
 
 type Product = {
-  id: number;
+  id: number | string; // Đã sửa lại để nhận cả ID dạng chuỗi của Firebase
   title: string;
   type: string;
   price: string;
@@ -65,15 +67,52 @@ const newsList: News[] = [
 
 export default function Home() {
   const [productLimit, setProductLimit] = useState(10);
+  const [firebaseProducts, setFirebaseProducts] = useState<Product[]>([]);
 
-  const visibleProducts = productList.slice(0, productLimit);
+  useEffect(() => {
+    if (!firebaseDatabase) return;
+    const productsRef = dbRef(firebaseDatabase, "/products");
+    const unsubscribe = onValue(
+      productsRef,
+      (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const fbProducts: Product[] = Object.entries(data).map(
+            ([key, value]: [string, any]) => {
+              // Cải thiện logic nhận diện loại sản phẩm (Bán/Cho thuê) từ Admin
+              const rawType = (value.type || value.label || "Bán").toString().toLowerCase();
+              const finalLabel = (rawType.includes("thuê") || rawType === "rent") ? "Cho thuê" : "Bán";
+
+              return {
+                id: key, 
+                title: value.title || "Chưa có tiêu đề",
+                type: finalLabel,
+                label: finalLabel,
+                price: value.price || "Liên hệ",
+                location: value.location || "TP.HCM",
+                region: value.region || value.location || "TP.HCM",
+                priceRange: value.priceRange || value.price || "Liên hệ",
+              };
+            }
+          ).reverse(); // Đảo ngược mảng để sản phẩm mới nhất lên đầu!
+          
+          setFirebaseProducts(fbProducts);
+        }
+      },
+      (error) => console.error("Error fetching products:", error)
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // Nếu có dữ liệu Firebase thì ưu tiên dùng toàn bộ, không thì dùng dữ liệu mẫu
+  const allProducts = firebaseProducts.length > 0 ? firebaseProducts : productList;
+  const visibleProducts = allProducts.slice(0, productLimit);
 
   const handleProductMore = () => {
     if (productLimit === 10) {
       setProductLimit(15);
       return;
     }
-
     window.location.href = "/san-pham";
   };
 
@@ -219,7 +258,8 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            {productList.slice(0, 5).map((product) => (
+            {/* Đã sửa: Đồng bộ thành allProducts thay vì productList */}
+            {allProducts.slice(0, 5).map((product) => (
               <article key={product.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                 <div className="mb-4 h-36 rounded-3xl bg-slate-200" />
                 <h3 className="text-lg font-semibold text-slate-900">{product.title}</h3>
@@ -240,7 +280,8 @@ export default function Home() {
             </Link>
           </div>
           <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-            {productList.filter((item) => item.label === "Bán").slice(0, 5).map((product) => (
+            {/* Đã sửa: Dùng allProducts để lấy dữ liệu thực từ Firebase */}
+            {allProducts.filter((item) => item.label === "Bán").slice(0, 5).map((product) => (
               <article key={product.id} className="min-w-[18rem] rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 h-40 rounded-3xl bg-slate-100" />
                 <h3 className="text-lg font-semibold text-slate-900">{product.title}</h3>
@@ -261,7 +302,8 @@ export default function Home() {
             </Link>
           </div>
           <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-            {productList.filter((item) => item.label === "Cho thuê").slice(0, 5).map((product) => (
+            {/* Đã sửa: Dùng allProducts để lấy dữ liệu thực từ Firebase */}
+            {allProducts.filter((item) => item.label === "Cho thuê").slice(0, 5).map((product) => (
               <article key={product.id} className="min-w-[18rem] rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 h-40 rounded-3xl bg-slate-100" />
                 <h3 className="text-lg font-semibold text-slate-900">{product.title}</h3>

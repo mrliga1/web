@@ -19,15 +19,11 @@ const hasFirebaseConfig = Boolean(
   firebaseConfig.appId
 );
 
-let app;
-let database;
-
-if (hasFirebaseConfig) {
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  database = getDatabase(app);
-}
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const database = hasFirebaseConfig ? getDatabase(app) : undefined;
 
 export const firebaseApp = app as any;
 export const firebaseDatabase = database as any;
+export { app };
 
 export const isFirebaseConfigured = hasFirebaseConfig && Boolean(app) && Boolean(database);

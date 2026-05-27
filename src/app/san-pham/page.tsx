@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { ref as dbRef, onValue } from "firebase/database";
+import { firebaseDatabase } from "../../lib/firebase";
 
 type Product = {
-  id: number;
+  id: number | string; // Cho phép ID là chuỗi của Firebase
   title: string;
   label: string;
   price: string;
@@ -44,19 +46,55 @@ export default function SanPhamPage() {
   const [searchText, setSearchText] = useState("");
   const [limit, setLimit] = useState(10);
   const [recommendLimit, setRecommendLimit] = useState(5);
+  const [firebaseProducts, setFirebaseProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (!firebaseDatabase) return;
+    const productsRef = dbRef(firebaseDatabase, "/products");
+    const unsubscribe = onValue(
+      productsRef,
+      (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const fbProducts: Product[] = Object.entries(data).map(
+            ([key, value]: [string, any]) => {
+              // Cải thiện logic lọc Bán/Cho thuê
+              const rawType = (value.type || value.label || "Bán").toString().toLowerCase();
+              const finalLabel = (rawType.includes("thuê") || rawType === "rent") ? "Cho thuê" : "Bán";
+              
+              return {
+                id: key, // Dùng ID thật của Firebase
+                title: value.title || "Chưa có tiêu đề",
+                label: finalLabel,
+                price: value.price || "Liên hệ",
+                location: value.location || "TP.HCM",
+                region: value.region || value.location || "TP.HCM",
+                priceRange: value.priceRange || value.price || "Liên hệ",
+              };
+            }
+          ).reverse(); // Mới nhất lên đầu
+          setFirebaseProducts(fbProducts);
+        }
+      },
+      (error) => console.error("Error fetching products:", error)
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const allProducts = firebaseProducts.length > 0 ? firebaseProducts : products;
 
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    return allProducts.filter((product) => {
       const matchesTab = activeTab === "Tất cả" || product.label === activeTab;
       const matchesRegion = regionFilter === "Tất cả khu vực" || product.region === regionFilter;
       const matchesPrice = priceFilter === "Tất cả mức giá" || product.priceRange === priceFilter;
       const matchesSearch = product.title.toLowerCase().includes(searchText.toLowerCase()) || product.location.toLowerCase().includes(searchText.toLowerCase());
       return matchesTab && matchesRegion && matchesPrice && matchesSearch;
     });
-  }, [activeTab, regionFilter, priceFilter, searchText]);
+  }, [activeTab, regionFilter, priceFilter, searchText, allProducts]);
 
   const visibleProducts = filteredProducts.slice(0, limit);
-  const recommendedProducts = products.slice(0, recommendLimit);
+  const recommendedProducts = allProducts.slice(0, recommendLimit);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -154,15 +192,17 @@ export default function SanPhamPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {visibleProducts.map((item) => (
-              <article key={item.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 h-36 rounded-3xl bg-slate-100" />
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800">{item.label}</span>
-                  <span className="text-xs text-slate-500">{item.region}</span>
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">{item.price}</p>
-              </article>
+              <Link href={`/san-pham/${item.id}`} key={item.id} className="block h-full">
+                <article className="h-full rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-emerald-500 cursor-pointer">
+                  <div className="mb-4 h-36 rounded-3xl bg-slate-100" />
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800">{item.label}</span>
+                    <span className="text-xs text-slate-500">{item.region}</span>
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{item.price}</p>
+                </article>
+              </Link>
             ))}
           </div>
 
@@ -192,11 +232,13 @@ export default function SanPhamPage() {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
             {recommendedProducts.map((item) => (
-              <article key={item.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <div className="mb-4 h-36 rounded-3xl bg-slate-200" />
-                <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">{item.price}</p>
-              </article>
+              <Link href={`/san-pham/${item.id}`} key={item.id} className="block h-full">
+                <article className="h-full rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:shadow-md hover:border-emerald-500 hover:bg-white cursor-pointer">
+                  <div className="mb-4 h-36 rounded-3xl bg-slate-200" />
+                  <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{item.price}</p>
+                </article>
+              </Link>
             ))}
           </div>
         </section>
@@ -212,12 +254,14 @@ export default function SanPhamPage() {
             </Link>
           </div>
           <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-            {products.filter((item) => item.label === "Bán").slice(0, 5).map((item) => (
-              <article key={item.id} className="min-w-[18rem] rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 h-40 rounded-3xl bg-slate-100" />
-                <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-3 text-sm text-slate-600">{item.location}</p>
-              </article>
+            {allProducts.filter((item) => item.label === "Bán").slice(0, 5).map((item) => (
+              <Link href={`/san-pham/${item.id}`} key={item.id} className="block min-w-[18rem]">
+                <article className="h-full rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-emerald-500 cursor-pointer">
+                  <div className="mb-4 h-40 rounded-3xl bg-slate-100" />
+                  <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
+                  <p className="mt-3 text-sm text-slate-600">{item.location}</p>
+                </article>
+              </Link>
             ))}
           </div>
         </section>
@@ -233,12 +277,14 @@ export default function SanPhamPage() {
             </Link>
           </div>
           <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-            {products.filter((item) => item.label === "Cho thuê").slice(0, 5).map((item) => (
-              <article key={item.id} className="min-w-[18rem] rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 h-40 rounded-3xl bg-slate-100" />
-                <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-3 text-sm text-slate-600">{item.location}</p>
-              </article>
+            {allProducts.filter((item) => item.label === "Cho thuê").slice(0, 5).map((item) => (
+              <Link href={`/san-pham/${item.id}`} key={item.id} className="block min-w-[18rem]">
+                <article className="h-full rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-emerald-500 cursor-pointer">
+                  <div className="mb-4 h-40 rounded-3xl bg-slate-100" />
+                  <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
+                  <p className="mt-3 text-sm text-slate-600">{item.location}</p>
+                </article>
+              </Link>
             ))}
           </div>
         </section>
@@ -261,12 +307,14 @@ export default function SanPhamPage() {
               { id: 4, title: "Greenia Riverside", status: "Đang mở bán", location: "Quận 7", price: "Từ 5.1 tỷ" },
               { id: 5, title: "Sunshine City", status: "Đã bàn giao", location: "Quận 9", price: "Từ 7.0 tỷ" },
             ].map((item) => (
-              <article key={item.id} className="min-w-[18rem] rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-                <div className="mb-4 h-40 rounded-3xl bg-slate-200" />
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{item.status}</div>
-                <h3 className="mt-3 text-xl font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-3 text-sm text-slate-600">{item.price}</p>
-              </article>
+              <Link href={`/du-an/${item.id}`} key={item.id} className="block min-w-[18rem]">
+                <article className="h-full rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm transition hover:shadow-md hover:border-emerald-500 cursor-pointer hover:bg-white">
+                  <div className="mb-4 h-40 rounded-3xl bg-slate-200" />
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{item.status}</div>
+                  <h3 className="mt-3 text-xl font-semibold text-slate-900">{item.title}</h3>
+                  <p className="mt-3 text-sm text-slate-600">{item.price}</p>
+                </article>
+              </Link>
             ))}
           </div>
         </section>

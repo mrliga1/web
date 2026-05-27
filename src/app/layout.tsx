@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Script from "next/script";
+import ClientOnlyAds from "../components/ClientOnlyAds";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -34,17 +35,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex min-h-screen flex-col bg-slate-50 text-slate-900">
-        <Script id="gtm-init" strategy="afterInteractive">
-          {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${GTM_ID}');`}
-        </Script>
-        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
-        <Script id="ga-init" strategy="afterInteractive">
-          {`window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${GA_ID}', { page_path: window.location.pathname });`}
-        </Script>
-        <Script async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS_ID}`} crossOrigin="anonymous" strategy="afterInteractive" />
-        <Script id="ads-init" strategy="afterInteractive">
-          {`(window.adsbygoogle = window.adsbygoogle || []).push({ google_ad_client: '${ADS_ID}', enable_page_level_ads: true });`}
-        </Script>
+        <ClientOnlyAds />
 
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-6">

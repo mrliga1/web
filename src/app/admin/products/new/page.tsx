@@ -2,12 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import ReactDOM from "react-dom";
 import MediaLibraryModal from "../../../../components/admin/MediaLibraryModal";
 import { firebaseDatabase } from "../../../../lib/firebase";
 import { getIdToken } from "../../../../lib/auth";
 import { push, ref as dbRef, set } from "firebase/database";
 
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(() => import("react-quill"), { ssr: false, loading: () => <div className="text-sm text-[#94a3b8]">Đang tải trình soạn thảo...</div> });
 import "react-quill/dist/quill.snow.css";
 
 export default function NewProductPage() {
@@ -111,7 +112,11 @@ export default function NewProductPage() {
         <div>
           <label className="block text-sm font-medium text-[#b9b3a1]">Chi tiết</label>
           <div className="mt-2 rounded-3xl border border-[#efdfa6] bg-[#0d1523] px-2 py-2 text-[#efdfa6]">
-            <ReactQuill value={content} onChange={setContent} theme="snow" />
+            {typeof (ReactDOM as any).findDOMNode === "function" ? (
+              <ReactQuill value={content} onChange={setContent} theme="snow" />
+            ) : (
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={8} className="w-full rounded-2xl border-none bg-transparent px-2 py-2 text-[#efdfa6] outline-none" />
+            )}
           </div>
         </div>
 
